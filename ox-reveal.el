@@ -73,6 +73,7 @@
     (:reveal-title-slide-background-repeat "REVEAL_TITLE_SLIDE_BACKGROUND_REPEAT" nil nil t)
     (:reveal-title-slide-background-transition "REVEAL_TITLE_SLIDE_BACKGROUND_TRANSITION" nil nil t)
     (:reveal-title-slide-background-opacity "REVEAL_TITLE_SLIDE_BACKGROUND_OPACITY" nil nil t)
+    (:reveal-title-slide-state "REVEAL_TITLE_SLIDE_STATE" nil nil t)
     (:reveal-toc-slide-background "REVEAL_TOC_SLIDE_BACKGROUND" nil nil t)
     (:reveal-toc-slide-background-size "REVEAL_TOC_SLIDE_BACKGROUND_SIZE" nil nil t)
     (:reveal-toc-slide-background-position "REVEAL_TOC_SLIDE_BACKGROUND_POSITION" nil nil t)
@@ -89,6 +90,8 @@
     (:reveal-preamble "REVEAL_PREAMBLE" nil org-reveal-preamble t)
     (:reveal-head-preamble "REVEAL_HEAD_PREAMBLE" nil org-reveal-head-preamble newline)
     (:reveal-postamble "REVEAL_POSTAMBLE" nil org-reveal-postamble t)
+    (:reveal-prologue "REVEAL_PROLOGUE" nil org-reveal-prologue t)
+    (:reveal-epilogue "REVEAL_EPILOGUE" nil org-reveal-epilogue t)
     (:reveal-multiplex-id "REVEAL_MULTIPLEX_ID" nil org-reveal-multiplex-id nil)
     (:reveal-multiplex-secret "REVEAL_MULTIPLEX_SECRET" nil org-reveal-multiplex-secret nil)
     (:reveal-multiplex-url "REVEAL_MULTIPLEX_URL" nil org-reveal-multiplex-url nil)
@@ -243,6 +246,16 @@ embedded into Reveal.initialize()."
   :group 'org-export-reveal
   :type 'string)
 
+(defcustom org-reveal-prologue nil
+  "Prologue contents to be inserted between opening <div reveal> and <div slides>."
+  :group 'org-export-reveal
+  :type 'string)
+
+(defcustom org-reveal-epilogue nil
+  "Prologue contents to be inserted between closing <div reveal> and <div slides>."
+  :group 'org-export-reveal
+  :type 'string)
+
 (defcustom org-reveal-slide-header nil
   "HTML content used as Reveal.js slide header"
   :group 'org-export-reveal
@@ -331,7 +344,7 @@ Example:
   :group 'org-export-reveal
   :type 'list)
 
-(defcustom org-reveal-highlight-css "%r/lib/css/zenburn.css"
+(defcustom org-reveal-highlight-css "%r/plugin/highlight/zenburn.css"
   "Highlight.js CSS file."
   :group 'org-export-reveal
   :type 'string)
@@ -637,10 +650,15 @@ using custom variable `org-reveal-root'."
          (version (org-reveal--get-reveal-js-version info))
          (reveal-css (org-reveal--choose-path root-path version "dist/reveal.css" "css/reveal.css"))
          (theme (plist-get info :reveal-theme))
-         (theme-css (org-reveal--choose-path root-path
-                                             version
-                                             (concat "dist/theme/" theme ".css")
-                                             (concat "css/theme/" theme ".css")))
+         (theme-css (if (or (string-prefix-p "http://" theme)
+                            (string-prefix-p "https://" theme)
+                            (string-prefix-p "file://" theme))
+                        ;; theme is just the URL to a custom theme CSS
+                        theme
+                      (org-reveal--choose-path root-path
+                                               version
+                                               (concat "dist/theme/" theme ".css")
+                                               (concat "css/theme/" theme ".css"))))
          (extra-css (plist-get info :reveal-extra-css))
          (in-single-file (plist-get info :reveal-single-file)))
     (concat
@@ -807,26 +825,27 @@ custom variable `org-reveal-root'."
            (init-options (plist-get info :reveal-init-options))
            (multiplex-statement
             ;; multiplexing - depends on defvar 'client-multiplex'
-            (when (memq 'multiplex plugins)
-              (concat
-               (format "multiplex: {
+            (let ((multiplex-id (plist-get info :reveal-multiplex-id)))
+              (when (not (string-empty-p multiplex-id))        ;Multiplex setup found
+                (concat
+                 (format "multiplex: {
     secret: %s, // null if client
     id: '%s', // id, obtained from socket.io server
     url: '%s' // Location of socket.io server
 },\n"
-                       (if (eq client-multiplex nil)
-                           (format "'%s'" (plist-get info :reveal-multiplex-secret))
-                         (format "null"))
-                       (plist-get info :reveal-multiplex-id)
-                       (plist-get info :reveal-multiplex-url))
-               (let ((url (plist-get info :reveal-multiplex-url)))
-                 (format "dependencies: [ { src: '%s/socket.io/socket.io.js', async: true }, { src: '%s/%s', async: true } ]"
-                         url url
-                         (if client-multiplex "client.js"
-                           (progn
-                             (setq client-multiplex t)
-                             "master.js")))))
-))
+                         (if (eq client-multiplex nil)
+                             (format "'%s'" (plist-get info :reveal-multiplex-secret))
+                           (format "null"))
+                         multiplex-id
+                         (plist-get info :reveal-multiplex-url))
+                 (let ((url (plist-get info :reveal-multiplex-url)))
+                   (format "dependencies: [ { src: '%s/socket.io/socket.io.js', async: true }, { src: '%s/%s', async: true } ]"
+                           url url
+                           (if client-multiplex "client.js"
+                             (progn
+                               (setq client-multiplex t)
+                               "master.js")))))
+                )))
            (extra-initial-js-statement (plist-get info :reveal-extra-initial-js))
            (legacy-dependency-statement
             (unless (or in-single-file (eq version 4))
@@ -948,7 +967,11 @@ Reveal.initialize({
              ;; Second value of the tuple, a list of Reveal plugin
              ;; initialization statements
              (format "plugins: [%s]"
-                     (mapconcat 'symbol-name plugins ", ")))
+                     (mapconcat 'symbol-name
+                                ;; Remove multiplex from plugins, as
+                                ;; the multiplex plugin has been moved
+                                ;; out of reveal.js.
+                                (seq-filter (lambda (p) (not (eq p 'multiplex))) plugins) ", ")))
           ;; No available plugin info found. Perhaps wrong plugin
           ;; names are given
           (cons nil nil)))
@@ -1345,7 +1368,7 @@ contextual information."
   "Generate the automatic title slide template."
   (let* ((spec (org-html-format-spec info))
          (title (org-export-data (plist-get info :title) info))
-	 (subtitle (plist-get info :subtitle))
+	 (subtitle (cdr (assq ?s spec)))
          (author (cdr (assq ?a spec)))
          (email (cdr (assq ?e spec)))
          (date (cdr (assq ?d spec))))
@@ -1379,9 +1402,9 @@ info is a plist holding export options."
            (if-format " lang=\"%s\"" (plist-get info :language)))
    "<meta charset=\"utf-8\"/>\n"
    (if-format "<title>%s</title>\n" (org-export-data (plist-get info :title) info))
-   (if-format "<meta name=\"author\" content=\"%s\"/>\n" (plist-get info :author))
-   (if-format "<meta name=\"description\" content=\"%s\"/>\n" (plist-get info :description))
-   (if-format "<meta name=\"keywords\" content=\"%s\"/>\n" (plist-get info :keywords))
+   (if-format "<meta name=\"author\" content=\"%s\"/>\n" (org-export-data (plist-get info :author) info))
+   (if-format "<meta name=\"description\" content=\"%s\"/>\n" (org-export-data (plist-get info :description) info))
+   (if-format "<meta name=\"keywords\" content=\"%s\"/>\n" (org-export-data (plist-get info :keywords) info))
    (org-reveal-stylesheets info)
    (org-reveal-mathjax-scripts info)
    (org-reveal--build-pre/postamble 'head-preamble info)
@@ -1390,8 +1413,9 @@ info is a plist holding export options."
    "</head>
 <body>\n"
    (org-reveal--build-pre/postamble 'preamble info)
-   "<div class=\"reveal\">
-<div class=\"slides\">\n"
+   "<div class=\"reveal\">\n"
+   (org-reveal--build-pre/postamble 'prologue info)
+   "<div class=\"slides\">\n"
    ;; Title slides
    (let ((title-slide (plist-get info :reveal-title-slide)))
      (when (and title-slide (not (plist-get info :reveal-subtree)))
@@ -1401,6 +1425,7 @@ info is a plist holding export options."
              (title-slide-background-repeat (plist-get info :reveal-title-slide-background-repeat))
              (title-slide-background-transition (plist-get info :reveal-title-slide-background-transition))
 	     (title-slide-background-opacity (plist-get info :reveal-title-slide-background-opacity))
+             (title-slide-state (plist-get info :reveal-title-slide-state))
              (title-slide-with-header (plist-get info :reveal-slide-global-header))
              (title-slide-with-footer (plist-get info :reveal-slide-global-footer)))
          (concat "<section id=\"sec-title-slide\""
@@ -1416,6 +1441,8 @@ info is a plist holding export options."
                    (concat " data-background-transition=\"" title-slide-background-transition "\""))
 		 (when title-slide-background-opacity
 		   (concat " data-background-opacity=\"" title-slide-background-opacity "\""))
+                 (when title-slide-state
+		   (concat " data-state=\"" title-slide-state "\""))
                  ">"
                  (when title-slide-with-header
                    (let ((header (plist-get info :reveal-slide-header)))
@@ -1429,8 +1456,9 @@ info is a plist holding export options."
                      (when footer (format "<div class=\"slide-footer\">%s</div>\n" footer))))
                  "</section>\n"))))
    contents
-   "</div>
-</div>\n"
+   "</div>\n"
+   (org-reveal--build-pre/postamble 'epilogue info)
+   "</div>\n"
    (org-reveal--build-pre/postamble 'postamble info)
    (org-reveal-scripts info)
    "</body>

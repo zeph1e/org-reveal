@@ -37,6 +37,7 @@
     - [[Select Theme][Select Theme]]([[https://github.com/yjwen/org-reveal#select-theme][gh]])
     - [[Set The Title Slide][Set The Title Slide]]([[https://github.com/yjwen/org-reveal#set-the-title-slide][gh]])
       - [[Customize the Title Slide][Customize the Title Slide]]([[https://github.com/yjwen/org-reveal#customize-the-title-slide][gh]])
+      - [[Title Slide State][Title Slide State]]([[https://github.com/yjwen/org-reveal#title-slide-state][gh]])
     - [[Set Slide Background][Set Slide Background]]([[https://github.com/yjwen/org-reveal#set-slide-background][gh]])
       - [[Single Colored Background][Single Colored Background]]([[https://github.com/yjwen/org-reveal#single-colored-background][gh]])
       - [[Single Image Background][Single Image Background]]([[https://github.com/yjwen/org-reveal#single-image-background][gh]])
@@ -63,6 +64,7 @@
 #+REVEAL: split:t
     - [[Preamble and Postamble][Preamble and Postamble]]([[https://github.com/yjwen/org-reveal#preamble-and-postamble][gh]])
       - [[Generating Pre/Postamble by Emacs-Lisp Functions][Generating Pre/Postamble by Emacs-Lisp Functions]]([[https://github.com/yjwen/org-reveal#generating-pre/postamble-by-emacs-lisp-functions][gh]])
+    - [[Prologue and Epilogue]]([[https://github.com/yjwen/org-reveal#prologue-and-epilogue][gh]])
     - [[Raw HTML in Slides][Raw HTML in Slides]]([[https://github.com/yjwen/org-reveal#raw-html-in-slides][gh]])
     - [[Speaker Notes][Speaker Notes]]([[https://github.com/yjwen/org-reveal#speaker-notes][gh]])
     - [[Multiplexing][Multiplexing]]([[https://github.com/yjwen/org-reveal#multiplexing][gh]])
@@ -277,15 +279,20 @@
 Theme is set globally throughout the whole file by setting option
 =REVEAL_THEME=.
 
+Available themes can be found in ~dist/theme~ in the reveal.js
+directory and can be select by giving the CSS file base name (without
+.css extension) to =REVEAL_THEME=.
+
+A custom theme CSS can be also set by giving its URL to
+~REVEAL_THEME~.
+
 Slide transition style is set by initialization option ~transition~
 and the transition speed is set by ~transitionSpeed~ . Please refer to
 section [[Initialization options]] for details.
 
-For an example, please check the heading part of this document.
-
-Available themes can be found in "css/theme/" in the reveal.js directory.
-
 Available transitions are: default|cube|page|concave|zoom|linear|fade|none.
+
+For an example of these settings, please check the heading part of this document.
 ** Set The Title Slide
    By default, Org-reveal generates a title slide displaying the
    title, the author, the Email, the date and the time-stamp of the
@@ -302,11 +309,11 @@ Available transitions are: default|cube|page|concave|zoom|linear|fade|none.
 
     There are 3 ways to customize the title slide.
 
-    1. Set variable ~org-reveal-title-slide~ to a string of HTML markups. 
+    1. Set variable ~org-reveal-title-slide~ to a string of HTML markups.
     2. Set ~reveal_title_slide~ in the ~#+OPTIONS:~ line to a string of HTML markups.
     3. Use one or more option lines ~#+REVEAL_TITLE_SLIDE:~ to specify
        the HTML of the title slide.
-       
+
     The following escaping characters can be used to retrieve document
     information:
     | ~%t~ | Title     |
@@ -315,6 +322,14 @@ Available transitions are: default|cube|page|concave|zoom|linear|fade|none.
     | ~%e~ | Email     |
     | ~%d~ | Date      |
     | ~%%~ | Literal % |
+
+*** Title Slide State
+
+    Using this option allows to thoroughly change the style of the title slide:
+
+    * =REVEAL_TITLE_SLIDE_STATE=: Style applied to the [[https://revealjs.com/markup/#viewport][viewport]] of title slide.
+      See the [[https://revealjs.com/markup/#slide-states][reveal.js documentation]]
+      for details.
 
 ** Set Slide Background
 
@@ -405,6 +420,7 @@ Available transitions are: default|cube|page|concave|zoom|linear|fade|none.
     * =REVEAL_TITLE_SLIDE_BACKGROUND_SIZE=: HTML size specification, e.g. ~200px~.
     * =REVEAL_TITLE_SLIDE_BACKGROUND_REPEAT=: Set to ~repeat~ to repeat the image.
     * =REVEAL_TITLE_SLIDE_BACKGROUND_OPACITY=: Set the background opacity.
+
 *** Table of Contents Slide Background Image
 
     To set the (automatically generated) table of contents slide's background
@@ -443,7 +459,7 @@ Available transitions are: default|cube|page|concave|zoom|linear|fade|none.
         ratio.
 
 ** Slide Numbering
-   
+
 To enable slide numbers, please add the following Reveal.js initial option.
 #+BEGIN_SRC org
 ,#+REVEAL_INIT_OPTIONS: slideNumber:true
@@ -604,7 +620,7 @@ be replaced by Reveal.js root path.
    To Use your Emacs theme, please make sure ~htmlize.el~ is
    installed. Then no more setup is necessary.
 
-   Below is an example of highlighted lisp code from org-reveal. 
+   Below is an example of highlighted lisp code from org-reveal.
    #+BEGIN_SRC lisp
      (defun org-reveal--read-file (file)
        "Return the content of file"
@@ -674,14 +690,14 @@ int main()
        ,#+end_src
 
    #+end_src
-   
+
 
 ** Editable Source Code
 It is now possible to embed code blocks in a codemirror instance in order to edit code during a presentation.  At present, this capacity is turned on or off at time export using these defcustoms:
 - ~org-reveal-klipsify-src~
 - ~org-reveal-klipse-css~
 - ~org-reveal-klipse-js~
-This feature is turned off by default and needs to be switched on with ~org-reveal-klipsify-src~.  At present code editing is supported in javascript, clojure, php, ruby, scheme, and python only.  
+This feature is turned off by default and needs to be switched on with ~org-reveal-klipsify-src~.  At present code editing is supported in javascript, clojure, php, ruby, scheme, and python only.
 
 ** MathJax
   :PROPERTIES:
@@ -728,6 +744,16 @@ This feature is turned off by default and needs to be switched on with ~org-reve
 
     So you can embed the Emacs-Lisp function as an Org-Babel source
     block and mark it to be evaluated when exporting the document.
+
+** Prologue and Epilogue
+
+Similar to preamble and postamble, arbitrary HTML contents can be
+inserted between the opening ~<div reveal>~ and ~<div slides>~ tags,
+called prologue, and their closing counterparts, called epilogue.
+
+Specify those contents by options ~REVEAL_PROLOGUE~ and
+~REVEAL_EPILOGUE~ for one buffer, or by variable ~org-reveal-prologue~
+and ~org-reveal-epilogue~ for global setup.
 
 ** Raw HTML in Slides
 
@@ -784,7 +810,6 @@ This feature is turned off by default and needs to be switched on with ~org-reve
 ,#+REVEAL_MULTIPLEX_ID: [Obtained from the socket.io server. ]
 ,#+REVEAL_MULTIPLEX_SECRET: [Obtained from socket.io server. Gives the master control of the presentation.]
 ,#+REVEAL_MULTIPLEX_URL:  https://reveal-multiplex.glitch.me [Location of socket.io server]
-,#+REVEAL_PLUGINS: ([any other plugins you are using] multiplex)
 #+END_SRC
 
    If your are using Reveal.js 3.x, an extra option is necessary for
@@ -927,7 +952,7 @@ To disable the automatic TOC, add =toc:nil= to =#+OPTIONS=
    the closing ~</script>~ tag.
 
 ** Executable Source Blocks
-To allow live execution of code in some languages, enable the klipse plugin by setting ~org-reveal-klipsify-src~ to non-nil.  Src blocks with the languages ~js~, ~clojure~, ~html~, ~python~, ~ruby~, ~scheme~, ~php~ will be executed with output shown in a console-like environment.  See the source code of ~org-reveal-src-block~ for more details.  
+To allow live execution of code in some languages, enable the klipse plugin by setting ~org-reveal-klipsify-src~ to non-nil.  Src blocks with the languages ~js~, ~clojure~, ~html~, ~python~, ~ruby~, ~scheme~, ~php~ will be executed with output shown in a console-like environment.  See the source code of ~org-reveal-src-block~ for more details.
 
 *** HTML Src Block
 #+BEGIN_SRC html
